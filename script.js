@@ -9,6 +9,51 @@ const GRAVITY = 1000;
 const PRIZE_R = 24;
 const PLAY_LEFT = DIVIDER.x + DIVIDER.w;
 const BOUNCE = 0.35;
+const CLAW_SPEED = 220;
+const TIP = 56;
+const CLAW_HOME_Y = RAIL_Y + 22;
+
+const claw = {
+    x: 500,
+    y: CLAW_HOME_Y;
+    open: 1
+};
+
+const input = { left: false, right: false };
+
+function updateClaw(dt){
+    if(input.left) claw.x -= CLAW_SPEED * dt;
+    if(input.right) claw.x += CLAW_SPEED * dt;
+    claw.x = clamp(claw.x, PIT.left + 20, PIT.right - 20);
+}
+
+window.addEventListener('keydown', e => {
+    if(e.key === 'ArrowLeft' || e.key === 'a'){
+        e.preventDefault();
+        input.left = true;
+    }
+    if(e.key === 'ArrowRight' || e.key === 'd'){
+        e.preventDefault();
+        input.right = true;
+    }
+});
+
+window.addEventListener('keyup', e => {
+    if(e.key === 'ArrowLeft' || e.key === 'a') input.left = false;
+    if(e.key === 'ArrowRight' || e.key === 'd') input.right = false;
+});
+
+function holdButton(id, name){
+    const el = document.getElementById(id);
+    const on = () => { input[name] = true; };
+    const off = () => { input[name] = false; };
+    el.addEventListener('pointerdown', on);
+    el.addEventListener('pointerup', off);
+    el.addEventListener('pointerleave', off);
+    el.addEventListener('pointercancel', off);
+}
+holdButton('btn-left', 'left');
+holdButton('btn-right', 'right');
 
 const SPAWN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZEEAAIIOOTNSR'.split('');
 SPAWN.push(' ', ' ', 'BACK', 'BACK');
@@ -169,15 +214,54 @@ function drawCabinet(){
     ctx.fillText('CHUTE', (PIT.left + DIVIDER.x) / 2, PIT.floor + 40);
 }
 
+function drawClaw(){
+    ctx.strokeStyle = '#8a8fa8';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(claw.x, RAIL_Y);
+    ctx.lineTo(claw.x, claw.y);
+    ctx.stroke();
+
+    ctx.fillStyle = '#9aa0bd';
+    ctx.fillRect(claw.x - 14, claw.y, 28, 14);
+
+    const spread = 14 + claw.open * 24;
+    ctx.strokeStyle = '#c9cde0';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for(const side of [-1,1]){
+        ctx.beginPath();
+        ctx.moveTo(claw.x + side * 12, claw.y + 12);
+        ctx.lineTo(claw.x + side * (spread + 8), claw.y + 34);
+        ctx.lineTo(claw.x + side * spread, claw.y + TIP);
+        ctx.stroke();
+    }
+}
+
+function drawAimGuide(){
+    ctx.save();
+    ctx.setLineDash([6, 8]);
+    ctx.strokeStyle = 'rgba(242, 193, 78, 0.25)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(claw.x, claw.y + TIP);
+    ctx.lineTo(claw.x, PIT.floor);
+    ctx.stroke();
+    ctx.restore();
+}
+
 function draw(){
     drawCabinet();
+    drawAimGuide();
     prizes.forEach(drawPrize);
+    drawClaw();
 }
 
 function update(dt){
+    updateClaw(dt);
     const steps = 3;
     for(let i = 0; i < steps; i++) stepPhysics(dt / steps);
-    for(const bar of bars) bar.glow = Math.max(0, bar.glow - dt * 3);
 }
 
 function rand(min, max){
