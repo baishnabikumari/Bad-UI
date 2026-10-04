@@ -4,18 +4,36 @@ const W = canvas.width;
 const H = canvas.height;
 const RAIL_Y = 70;
 const PIT = { left: 40, right: 860, floor: 540 };
-const DIVIDER = { x: 160, w: 14, h: 120 };
 const GRAVITY = 1000;
-const PRIZE_R = 24;
-const PLAY_LEFT = DIVIDER.x + DIVIDER.w;
 const BOUNCE = 0.35;
 const CLAW_SPEED = 220;
 const TIP = 56;
 const CLAW_HOME_Y = RAIL_Y + 22;
+const BALL_R = 22;
+const BAR_COUNT = 14;
+const BAR_W = (PIT.right - PIT.left) / BAR_COUNT;
+const BAR_H = 60;
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const SCALE = [0,2,4,7,9];
+const ROOT = 48;
+
+function barNote(i){
+    return ROOT + SCALE[i % SCALE.length] + 12 * Math.floor(i / SCALE.length);
+}
+
+function noteName(n){
+    return NOTE_NAMES[n % 12] + (Math.floor(n / 12) -1);
+}
+
+const bars = [];
+for(let i = 0; i < BAR_COUNT; i++){
+    bars.push({ i, x: PIT.left + i * BAR_W, note: barNote(i), glow: 0 });
+}
 
 const claw = {
     x: 500,
-    y: CLAW_HOME_Y;
+    y: CLAW_HOME_Y,
     open: 1
 };
 
@@ -55,10 +73,18 @@ function holdButton(id, name){
 holdButton('btn-left', 'left');
 holdButton('btn-right', 'right');
 
-const SPAWN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZEEAAIIOOTNSR'.split('');
-SPAWN.push(' ', ' ', 'BACK', 'BACK');
+const BALL_TYPES = [
+    { name: 'sine', wave: 'sine', label: 'SIN', hue: 190 },
+    { name: 'triangle', wave: 'triangle', label: 'TRI', hue: 130 },
+    { name: 'saw', wave: 'sawtooth', label: 'SAW', hue: 30 },
+    { name: 'square', wave: 'square', label: 'SQR', hue: 320 }
+];
 
-let prizes = [];
+let balls = [];
+
+function randomType(){
+    return BALL_TYPES[Math.floor(Math.random() * BALL_TYPES.length)];
+}
 
 function barUnder(x){
     const i = clamp(Math.floor((x - PIT.left) / BAR_W), 0, BAR_COUNT - 1);
@@ -70,20 +96,15 @@ function hitBar(b, impact){
     bar.glow = 1;
 }
 
-function makePrize(ch, x, y){
-    return { ch, x, y, vx: 0, vy: 0, r: PRIZE_R, hue: rand(0, 360), held: false };
+function makeBall(type, x, y){
+    return { type, x, y, vx: 0, vy: 0, r: BALL_R, held: false };
 }
 
-function fillPit(){
-    prizes = SPAWN.map(ch =>
-        makePrize(ch, rand(PLAY_LEFT + PRIZE_R, PIT.right - PRIZE_R), rand(100, 380))
-    );
-}
-
-function labelFor(ch){
-    if(ch === ' ') return '_';
-    if(ch === 'BACK') return '\u2190';
-    return ch;
+function fillPit(count){
+    balls = [];
+    for(let i = 0; i < count; i++){
+        balls.push(makeBall(randomType(), rand(PIT.left + BALL_R, PIT.right - BALL_R), rand(80, 300)));
+    }
 }
 
 function integrate(p, dt){
@@ -96,42 +117,22 @@ function integrate(p, dt){
 function keepInBounds(b){
     if(b.held) return;
 
-    if(b.x + b.r > bIT.floor){
+    if(b.y + b.r > PIT.floor){
         const impact = b.vy;
-        b.y = bIT.floor - b.r;
+        b.y = PIT.floor - b.r;
         b.vy *= -BOUNCE;
         b.vx *= 0.9;
+
         if(impact > 120) hitBar(b, impact);
         if(Math.abs(b.vy) < 25) b.vy = 0;
     }
-    if(b.x - b.r < PIT.left) { b.x = PIT.left + b.r; b.vx *= -0.4; }
-    if(b.x + b.r > PIT.right) { b.x = PIT.right - b.r; b.vx *= -0.4; }
-}
-
-function hitDivider(p){
-    if(p.held) return;
-    const top = PIT.floor - DIVIDER.h;
-    const cx = clamp(p.x, DIVIDER.x, DIVIDER.x + DIVIDER.w);
-    const cy = clamp(p.y, top, PIT.floor);
-    const dx = p.x - cx;
-    const dy = p.y - cy;
-    const dist = Math.hypot(dx, dy);
-    if(dist >= p.r) return;
-
-    if(dist === 0){
-        p.y = top - p.r;
-        p.vy = 0;
-        return;
+    if(b.x - b.r < PIT.left) { 
+        b.x = PIT.left + b.r;
+        b.vx *= -0.4;
     }
-    const nx = dx / dist;
-    const ny = dy / dist;
-    p.x += nx * (p.r - dist);
-    p.y += ny * (p.r - dist);
-
-    const vn = p.vx * nx + p.vy * ny;
-    if(vn < 0){
-        p.vx -= (1 + BOUNCE) * vn * nx;
-        p.vy -= (1 + BOUNCE) * vn * ny;
+    if(b.x + b.r > PIT.right) {
+        b.x = PIT.right - b.r;
+        b.vx *= -0.4;
     }
 }
 
@@ -168,29 +169,28 @@ function collideBalls(){
 
 function stepPhysics(dt){
     for(const p of balls) integrate(p, dt);
-    for (let i = 0; i < 2; i++) collideballs();
-    for (const p of balls){
-        hitDivider(p);
-    }
+    for (let i = 0; i < 2; i++) collideBalls();
+    for (const p of balls) keepInBounds(b);
+    for(const bar of bars) bar.glow = Math.max(0, bar.glow - dt * 3);
 }
 
 function drawPrize(p){
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fillStyle = `hsl(${p.hue}, 65%, 55%)`;
+    ctx.arc(b.x, b.y, b.r, 0, Math.bI * 2);
+    ctx.fillStyle = `hsl(${b.hue}, 65%, 55%)`;
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(p.x - 8, p.y - 9, 5, 0, Math.PI * 2);
+    ctx.beginbath();
+    ctx.arc(b.x - 8, b.y - 9, 5, 0, Math.bI * 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.fill();
     ctx.fillStyle = '#111';
     ctx.font = 'bold 22px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(labelFor(p.ch), p.x, p.y + 1);
+    ctx.fillText(labelFor(b.ch), b.x, b.y + 1);
 }
 // draw
 function drawCabinet(){
@@ -200,18 +200,33 @@ function drawCabinet(){
     ctx.fillRect(PIT.left, 30, PIT.right - PIT.left, PIT.floor - 30);
     ctx.fillStyle = '#4a4f68';
     ctx.fillRect(PIT.left, RAIL_Y - 6, PIT.right - PIT.left, 12);
-    ctx.fillStyle = '#07070c';
-    ctx.fillRect(PIT.left, PIT.floor, DIVIDER.x - PIT.left, H - PIT.floor);
-    ctx.fillStyle = '#34344f';
-    ctx.fillRect(DIVIDER.x, PIT.floor, PIT.right - DIVIDER.x, H - PIT.floor);
-    ctx.fillStyle = '#5b5f80';
-    ctx.fillRect(DIVIDER.x, PIT.floor - DIVIDER.h, DIVIDER.w, DIVIDER.h);
+    // ctx.fillStyle = '#07070c';
+    // ctx.fillRect(PIT.left, PIT.floor, DIVIDER.x - PIT.left, H - PIT.floor);
+    // ctx.fillStyle = '#34344f';
+    // ctx.fillRect(DIVIDER.x, PIT.floor, PIT.right - DIVIDER.x, H - PIT.floor);
+    // ctx.fillStyle = '#5b5f80';
+    // ctx.fillRect(DIVIDER.x, PIT.floor - DIVIDER.h, DIVIDER.w, DIVIDER.h);
 
-    ctx.fillStyle = '#f2c14e';
-    ctx.font = 'bold 14px monospace';
+//     ctx.fillStyle = '#f2c14e';
+//     ctx.font = 'bold 14px monospace';
+//     ctx.textAlign = 'center';
+//     ctx.textBaseline = 'alphabetic';
+//     ctx.fillText('CHUTE', (PIT.left + DIVIDER.x) / 2, PIT.floor + 40);
+}
+
+function drawBars(){
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText('CHUTE', (PIT.left + DIVIDER.x) / 2, PIT.floor + 40);
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 13px monospace';
+    for(const bar of bars){
+        const lit = 45 + bar.glow * 25;
+        ctx.fillStyle = `hsl(${200 + bar.i * 11}, 55%, ${lit}%)`;
+        ctx.fillRect(bar.x + 2, PIT.floor, BAR_W - 4, BAR_H);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.fillText(noteName(bar.note), bar.x + BAR_W / 2, PIT.floor + BAR_H / 2);
+    }
+    ctx.fillStyle = '#34344f';
+    ctx.fillRect(PIT.left - 8, PIT.floor + BAR_H, PIT.right - PIT.left + 16, H - PIT.floor - BAR_H);
 }
 
 function drawClaw(){
@@ -253,8 +268,9 @@ function drawAimGuide(){
 
 function draw(){
     drawCabinet();
+    drawBars();
     drawAimGuide();
-    prizes.forEach(drawPrize);
+    balls.forEach(drawBall);
     drawClaw();
 }
 
