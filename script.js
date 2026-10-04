@@ -7,8 +7,12 @@ const PIT = { left: 40, right: 860, floor: 540 };
 const GRAVITY = 1000;
 const BOUNCE = 0.35;
 const CLAW_SPEED = 220;
+const DROP_SPEED = 260;
+const LIFT_SPEED = 200;
 const TIP = 56;
 const CLAW_HOME_Y = RAIL_Y + 22;
+const CLAW_MAX_Y = PIT.floor - TIP - 6;
+const GRAB_RANGE = 40;
 const BALL_R = 22;
 const BAR_COUNT = 14;
 const BAR_W = (PIT.right - PIT.left) / BAR_COUNT;
@@ -34,15 +38,51 @@ for(let i = 0; i < BAR_COUNT; i++){
 const claw = {
     x: 500,
     y: CLAW_HOME_Y,
-    open: 1
+    open: 1,
+    state: 'idle',
+    timer: 0,
+    held: null
 };
 
 const input = { left: false, right: false };
 
 function updateClaw(dt){
-    if(input.left) claw.x -= CLAW_SPEED * dt;
-    if(input.right) claw.x += CLAW_SPEED * dt;
+    switch(claw.state){
+        case 'idle':
+            if(input.left) claw.x -= CLAW_SPEED * dt;
+            if(input.right) claw.x += CLAW_SPEED * dt;
+            break;
+        case 'descending':
+            claw.y += DROP_SPEED * dt;
+            if(claw.y >= CLAW_MAX_Y || clawTouchesBall()){
+                claw.state = 'grabbing';
+                claw.timer = 0;
+            }
+            break;
+        case 'grabbing':
+            claw.timer += dt;
+            claw.open = Math.max(0, 1 - claw.timer / 0.5);
+            if(claw.timer >= 0.5){
+                claw.held = pickBall();
+                claw.state = 'lifting';
+            }
+            break;
+        case 'lifting':
+            claw.y -= LIFT_SPEED * dt;
+            if(claw.y <= CLAW_HOME_Y){
+                claw.y = CLAW_HOME_Y;
+                claw.state = 'idle';
+                claw.open = claw.held ? 0 : 1;
+            }
+            break;
+
+    }
     claw.x = clamp(claw.x, PIT.left + 20, PIT.right - 20);
+
+    if(claw.held){
+        claw.held.x = claw.x;
+        claw.held.y = claw.y + 50;
+    }
 }
 
 window.addEventListener('keydown', e => {
@@ -53,6 +93,10 @@ window.addEventListener('keydown', e => {
     if(e.key === 'ArrowRight' || e.key === 'd'){
         e.preventDefault();
         input.right = true;
+    }
+    if(e.key === ' ' || e.key === 'ArrowDown' || e.key === 'Enter'){
+        e.preventDefault();
+        pressDrop();
     }
 });
 
@@ -114,6 +158,49 @@ function integrate(p, dt){
     p.y += p.vy * dt;
 }
 
+function pressDrop(){
+    if(claw.held){
+        letGo();
+        return;
+    }
+    if(claw.state !== 'idle') return;
+    claw.state = 'descending';
+}
+
+function clawTouchesBall(){
+    const tipY = claw.y + TIP;
+    return balls.some(b => 
+        !b.held &&
+        b.y > claw.y &&
+        Math.abs(b.x - claw.x) < b.r + 14 &&
+        b.y - b.r < tipY
+    );
+}
+
+function pickBall(){
+    let best = null;
+    let bestDist = GRAB_RANGE;
+    for(const b of balls){
+        if(b.held) continue;
+        const d = Math.hypot(b.x - claw.x, b.y - (claw.y + TIP));
+        if(d < bestDist){
+            best = b;
+            bestDist = d;
+        }
+    }
+    if(best) best.held = true;
+    return best;
+}
+
+function letGo(){
+    if(!claw.held) return;
+    claw.held.held = false;
+    claw.held.vx = 0;
+    claw.held.vy = 0;
+    claw.held = null;
+    claw.open = 1;
+}
+
 function keepInBounds(b){
     if(b.held) return;
 
@@ -170,20 +257,20 @@ function collideBalls(){
 function stepPhysics(dt){
     for(const p of balls) integrate(p, dt);
     for (let i = 0; i < 2; i++) collideBalls();
-    for (const p of balls) keepInBounds(b);
+    for (const p of balls) keepInBounds(p);
     for(const bar of bars) bar.glow = Math.max(0, bar.glow - dt * 3);
 }
 
 function drawPrize(p){
     ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.bI * 2);
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
     ctx.fillStyle = `hsl(${b.hue}, 65%, 55%)`;
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.stroke();
     ctx.beginbath();
-    ctx.arc(b.x - 8, b.y - 9, 5, 0, Math.bI * 2);
+    ctx.arc(b.x - 8, b.y - 9, 5, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.fill();
     ctx.fillStyle = '#111';
@@ -274,6 +361,25 @@ function draw(){
     drawClaw();
 }
 
+function drawBall(b){
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = `hsl(${b.type.hue}, 65%, 55%)`;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(b.x - 7, b.y - 8, 4, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, 0.35)`;
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(b.type.label, b.x, b.y + 1);
+}
+
 function update(dt){
     updateClaw(dt);
     const steps = 3;
@@ -297,5 +403,5 @@ function frame(now){
     requestAnimationFrame(frame);
 }
 
-fillPit();
+fillPit(16);
 requestAnimationFrame(frame);
