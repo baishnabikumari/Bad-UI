@@ -86,6 +86,7 @@ function updateClaw(dt){
 }
 
 window.addEventListener('keydown', e => {
+    ensureAudio();
     if(e.key === 'ArrowLeft' || e.key === 'a'){
         e.preventDefault();
         input.left = true;
@@ -107,7 +108,7 @@ window.addEventListener('keyup', e => {
 
 function holdButton(id, name){
     const el = document.getElementById(id);
-    const on = () => { input[name] = true; };
+    const on = () => { ensureAudio(); input[name] = true; };
     const off = () => { input[name] = false; };
     el.addEventListener('pointerdown', on);
     el.addEventListener('pointerup', off);
@@ -116,6 +117,7 @@ function holdButton(id, name){
 }
 holdButton('btn-left', 'left');
 holdButton('btn-right', 'right');
+document.getElementById('btn-drop').addEventListener('click', pressDrop);
 
 const BALL_TYPES = [
     { name: 'sine', wave: 'sine', label: 'SIN', hue: 190 },
@@ -138,6 +140,9 @@ function barUnder(x){
 function hitBar(b, impact){
     const bar = barUnder(b.x);
     bar.glow = 1;
+    const freq = noteToFreq(bar.note);
+    const velocity = clamp(impact / 700, 0.1, 1);
+    playNote(freq, b.type.wave, velocity);
 }
 
 function makeBall(type, x, y){
@@ -261,24 +266,24 @@ function stepPhysics(dt){
     for(const bar of bars) bar.glow = Math.max(0, bar.glow - dt * 3);
 }
 
-function drawPrize(p){
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fillStyle = `hsl(${b.hue}, 65%, 55%)`;
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.stroke();
-    ctx.beginbath();
-    ctx.arc(b.x - 8, b.y - 9, 5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.fill();
-    ctx.fillStyle = '#111';
-    ctx.font = 'bold 22px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(labelFor(b.ch), b.x, b.y + 1);
-}
+// function drawPrize(p){
+//     ctx.beginPath();
+//     ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+//     ctx.fillStyle = `hsl(${b.hue}, 65%, 55%)`;
+//     ctx.fill();
+//     ctx.lineWidth = 3;
+//     ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+//     ctx.stroke();
+//     ctx.beginbath();
+//     ctx.arc(b.x - 8, b.y - 9, 5, 0, Math.PI * 2);
+//     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+//     ctx.fill();
+//     ctx.fillStyle = '#111';
+//     ctx.font = 'bold 22px monospace';
+//     ctx.textAlign = 'center';
+//     ctx.textBaseline = 'middle';
+//     ctx.fillText(labelFor(b.ch), b.x, b.y + 1);
+// }
 // draw
 function drawCabinet(){
     ctx.fillStyle = '#12121c';
@@ -401,6 +406,42 @@ function frame(now){
     update(dt);
     draw();
     requestAnimationFrame(frame);
+}
+
+let audioCtx = null;
+
+function ensureAudio(){
+    if(!audioCtx){
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended'){
+        audioCtx.resume();
+    }
+}
+
+function noteToFreq(n){
+    return 440 * Math.pow(2, (n - 69) / 12);
+}
+
+function playNote(freq, wave, velocity){
+    if(!audioCtx) return;
+
+    const now = audioCtx.currentTime;
+    const peak = clamp(velocity, 0.08, 1) * 0.5;
+
+    const osc = audioCtx.createOscillator();
+    osc.type = wave;
+    osc.frequency.value = freq;
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(peak, now + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.95);
 }
 
 fillPit(16);
