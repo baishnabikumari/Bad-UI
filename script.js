@@ -22,6 +22,135 @@ const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const SCALE = [0,2,4,7,9];
 const ROOT = 48;
 
+const SEQ_STEPS = 8;
+const seqState = {
+    kick: new Array(SEQ_STEPS).fill(false),
+    hat: new Array(SEQ_STEPS).fill(false)
+};
+let seqStep = 0;
+let seqPlaying = false;
+let seqTimer = null;
+let seqBpm = 110;
+
+function playKick(){
+    if(!audioCtx) return;
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.12);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.9, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.32);
+}
+
+function playHat(){
+    if(!audioCtx) return;
+    const now = audioCtx.currentTime;
+
+    const bufferSize = audioCtx.sampleRate * 0.1;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i = 0; i < bufferSize; i++){
+        data[i] = Math.random() * 2 - 1;
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 7000;
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+    noise.connect(hp);
+    hp.connect(gain);
+    gain.connect(audioCtx.destination);
+    noise.start(now);
+}
+
+
+function buildSeqUI(){
+    for(const track of ['kick', 'hat']){
+        const row = document.getElementById('seq-' + track);
+        row.innerHTML = '';
+        for(let i = 0; i < SEQ_STEPS; i++){
+            const cell = document.createElement('div');
+            cell.className = 'step';
+            cell.addEventListener('click', () => {
+                ensureAudio();
+                seqState[track][i] = !seqState[track][i];
+                cell.classList.toggle('on', seqState[track][i]);
+            });
+            row.appendChild(cell);
+        }
+    }
+}
+
+function refreshSeqHighlight(){
+    for(const track of ['kick', 'hat']){
+        const row = document.getElementById('seq-' + track);
+        [...row.children].forEach((cell, i) => {
+            cell.classList.toggle('current', i === seqStep);
+        });
+    }
+}
+
+function seqTick(){
+    if(seqState.kick[seqStep]) playKick();
+    if(seqState.hat[seqStep]) playHat();
+    refreshSeqHighlight();
+    seqStep = (seqStep + 1) % SEQ_STEPS;
+}
+
+function seqStart(){
+    ensureAudio();
+    seqPlaying = true;
+    seqStep = 0;
+    const stepMs = (60 / seqBpm / 2) * 1000;
+    seqTimer = setInterval(seqTick, stepMs);
+    document.getElementById('seq-play').textContent = 'STOP';
+    document.getElementById('seq-play').classList.add('playing');
+}
+
+function seqStop(){
+    seqPlaying = false;
+    clearInterval(seqTimer);
+    seqTimer = null;
+    document.getElementById('seq-play').textContent = 'PLAY';
+    document.getElementById('seq-play').classList.remove('playing');
+    refreshSeqHighlight();
+}
+
+document.getElementById('seq-play').addEventListener('click', () => {
+    if(seqPlaying) seqStop();
+    else seqStart();
+});
+
+document.getElementById('seq-bpm').addEventListener('input', e => {
+    seqBpm = Number(e.target.value);
+    document.getElementById('seq-bpm-val').textContent = seqBpm;
+    if(seqPlaying){
+        clearInterval(seqTimer);
+        const stepMs = (60 / seqBpm / 2) * 1000;
+        seqTimer = setInterval(seqTick, stepMs);
+    }
+});
+
+const BALL_TYPES = [
+    { name: 'sine', wave: 'sine', label: 'SIN', hue: 190 },
+    { name: 'triangle', wave: 'triangle', label: 'TRI', hue: 130 },
+    { name: 'saw', wave: 'sawtooth', label: 'SAW', hue: 30 },
+    { name: 'square', wave: 'square', label: 'SQR', hue: 320 },
+    { name: 'pluck', wave: 'pluck', label: 'PLK', hue: 80 }
+];
+
 function barNote(i){
     return ROOT + SCALE[i % SCALE.length] + 12 * Math.floor(i / SCALE.length);
 }
@@ -119,13 +248,6 @@ holdButton('btn-left', 'left');
 holdButton('btn-right', 'right');
 document.getElementById('btn-drop').addEventListener('click', pressDrop);
 
-const BALL_TYPES = [
-    { name: 'sine', wave: 'sine', label: 'SIN', hue: 190 },
-    { name: 'triangle', wave: 'triangle', label: 'TRI', hue: 130 },
-    { name: 'saw', wave: 'sawtooth', label: 'SAW', hue: 30 },
-    { name: 'square', wave: 'square', label: 'SQR', hue: 320 }
-];
-
 let balls = [];
 
 function randomType(){
@@ -140,9 +262,15 @@ function barUnder(x){
 function hitBar(b, impact){
     const bar = barUnder(b.x);
     bar.glow = 1;
+
     const freq = noteToFreq(bar.note);
     const velocity = clamp(impact / 700, 0.1, 1);
-    playNote(freq, b.type.wave, velocity);
+
+    if(b.type.wave === 'pluck'){
+        playNote(freq, velocity);
+    } else {
+        playNote(freq, b.type.wave, velocity);
+    }
 }
 
 function makeBall(type, x, y){
@@ -266,24 +394,6 @@ function stepPhysics(dt){
     for(const bar of bars) bar.glow = Math.max(0, bar.glow - dt * 3);
 }
 
-// function drawPrize(p){
-//     ctx.beginPath();
-//     ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-//     ctx.fillStyle = `hsl(${b.hue}, 65%, 55%)`;
-//     ctx.fill();
-//     ctx.lineWidth = 3;
-//     ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-//     ctx.stroke();
-//     ctx.beginbath();
-//     ctx.arc(b.x - 8, b.y - 9, 5, 0, Math.PI * 2);
-//     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-//     ctx.fill();
-//     ctx.fillStyle = '#111';
-//     ctx.font = 'bold 22px monospace';
-//     ctx.textAlign = 'center';
-//     ctx.textBaseline = 'middle';
-//     ctx.fillText(labelFor(b.ch), b.x, b.y + 1);
-// }
 // draw
 function drawCabinet(){
     ctx.fillStyle = '#12121c';
@@ -292,18 +402,6 @@ function drawCabinet(){
     ctx.fillRect(PIT.left, 30, PIT.right - PIT.left, PIT.floor - 30);
     ctx.fillStyle = '#4a4f68';
     ctx.fillRect(PIT.left, RAIL_Y - 6, PIT.right - PIT.left, 12);
-    // ctx.fillStyle = '#07070c';
-    // ctx.fillRect(PIT.left, PIT.floor, DIVIDER.x - PIT.left, H - PIT.floor);
-    // ctx.fillStyle = '#34344f';
-    // ctx.fillRect(DIVIDER.x, PIT.floor, PIT.right - DIVIDER.x, H - PIT.floor);
-    // ctx.fillStyle = '#5b5f80';
-    // ctx.fillRect(DIVIDER.x, PIT.floor - DIVIDER.h, DIVIDER.w, DIVIDER.h);
-
-//     ctx.fillStyle = '#f2c14e';
-//     ctx.font = 'bold 14px monospace';
-//     ctx.textAlign = 'center';
-//     ctx.textBaseline = 'alphabetic';
-//     ctx.fillText('CHUTE', (PIT.left + DIVIDER.x) / 2, PIT.floor + 40);
 }
 
 function drawBars(){
@@ -428,21 +526,62 @@ function playNote(freq, wave, velocity){
 
     const now = audioCtx.currentTime;
     const peak = clamp(velocity, 0.08, 1) * 0.5;
-
-    const osc = audioCtx.createOscillator();
-    osc.type = wave;
-    osc.frequency.value = freq;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(freq * 10, now);
+    filter.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.5);
 
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(peak, now + 0.006);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
 
-    osc.connect(gain);
+    filter.connect(gain);
     gain.connect(audioCtx.destination);
-    osc.start(now);
-    osc.stop(now + 0.95);
+
+    const detunes = [-6, 0, 6];
+    for(const cents of detunes){
+        const osc = audioCtx.createOscillator();
+        osc.type = wave;
+        osc.frequency.value = freq;
+        osc.detunes.value = freq;
+        osc.connect(filter);
+        osc.start(now);
+        osc.stop(now + 0.95);
+    }
 }
 
+function playPluck(freq, velocity){
+    const sampleRate = audioCtx.sampleRate;
+    const period = Math.round(sampleRate / freq);
+    const duration = 1.2;
+    const totalSamples = Math.floor(sampleRate * duration);
+    const buffer = audioCtx.createBuffer(1, totalSamples, sampleRate);
+    const data = buffer.getChannelData(0);
+    const ringBuf = new Float32Array(period);
+    for(let i = 0; i < period; i++){
+        ringBuf[i] = (Math.random() * 2 - 1) * velocity;
+    }
+    let ringPos = 0;
+    for(let i = 0; i < totalSamples; i++){
+        const current = ringBuf[ringPos];
+        const next = ringBuf[(ringPos + 1) % period];
+        const avg = (current + next) * 0.5 * 0.996;
+        ringBuf[ringPos] = avg;
+        data[i] = current;
+        ringPos = (ringPos + 1) % period;
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+
+    const gain = audioCtx.createGain();
+    gain.gain.value = clamp(velocity, 0.1, 1);
+
+    src.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start(audioCtx.currentTime);
+}
+
+buildSeqUI();
 fillPit(16);
 requestAnimationFrame(frame);

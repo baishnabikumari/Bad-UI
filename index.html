@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clawboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <main>
         <h1>Clawboard</h1>
@@ -20,7 +22,26 @@
             <button id="btn-drop" class="pad drop">DROP</button>
             <button id="btn-right" class="pad">&rarr;</button>
         </div>
+        <div class="sequencer">
+            <div class="seq-top">
+                <button id="seq-play" class="pad seq-play">PLAY</button>
+                <label class="bpm-label">
+                    BPM
+                    <input id="seq-bpm" type="range" min="60" max="180" value="110">
+                    <span id="seq-bpm-val">110</span>
+                </label>
+            </div>
+            <div class="seq-row" data-track="kick">
+                <span class="seq-name">KICK</span>
+                <span class="seq-steps" id="seq-kick"></span>
+            </div>
+            <div class="seq-row" data-track="hat">
+                <span class="seq-name">HAT</span>
+                <div class="seq-steps" id="seq-hat"></div>
+            </div>
+        </div>
     </main>
     <script src="script.js"></script>
 </body>
+
 </html>

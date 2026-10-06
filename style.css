@@ -67,3 +67,72 @@ canvas{
 
 .pad:active{ background: #34385a; }
 .pad.drop{ background: #7a2b3a; border-color: #b0475c; padding: 14px 44px; }
+
+.sequencer{
+    margin-top: 22px;
+    text-align: left;
+}
+
+.seq-top{
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+
+.seq-play{
+    padding: 8px 20px;
+    font-size: 14px;
+}
+
+.seq-play.playing{
+    background: #2b6b45;
+    border-color: #3f9a62;
+}
+
+.bpm-label{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #8a8fa8;
+    letter-spacing: 2px;
+}
+
+.seq-row{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.seq-name{
+    width: 44px;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #8a8fa8;
+}
+
+.seq-steps{
+    display: flex;
+    gap: 6px;
+}
+
+.step{
+    width: 32px;
+    height: 32px;
+    border: 2px solid #3a3d57;
+    border-radius: 6px;
+    background: #16161f;
+    cursor: pointer;
+}
+
+.step.on{
+    background: #4a4f68;
+    border-color: #8a8fa8;
+}
+
+.step.current{
+    outline: 2px solid #f2c14e;
+    outline-offset: 2px;
+}
