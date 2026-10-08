@@ -146,3 +146,38 @@ canvas{
 .midi-status.on{
     color: #3f9a62;
 }
+
+.scale-picker{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 14px;
+}
+
+.scale-select{
+    padding: 8px 14px;
+    font-size: 14px;
+}
+
+.machine{ position: relative; }
+
+.hint{
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #f2c14e;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 6px 14px;
+    border-radius: 6px;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.6s;
+}
+
+.hint.hidden{
+    opacity: 0;
+}

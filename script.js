@@ -19,7 +19,13 @@ const BAR_W = (PIT.right - PIT.left) / BAR_COUNT;
 const BAR_H = 60;
 
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const SCALE = [0,2,4,7,9];
+const SCALE ={
+    major: [0, 2, 4, 5, 7, 9, 11],
+    minor: [0, 2, 3, 5, 7, 8, 10],
+    chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8 , 9, 10, 11]
+};
+let currentScale = SCALE.major;
+
 const ROOT = 48;
 
 const SEQ_STEPS = 8;
@@ -31,6 +37,9 @@ let seqStep = 0;
 let seqPlaying = false;
 let seqTimer = null;
 let seqBpm = 110;
+let spawnTimer = 0;
+const SPAWN_INTERVAL = 4;
+const MAX_BALLS = 24;
 
 function playKick(){
     if(!audioCtx) return;
@@ -209,7 +218,7 @@ const BALL_TYPES = [
 ];
 
 function barNote(i){
-    return ROOT + SCALE[i % SCALE.length] + 12 * Math.floor(i / SCALE.length);
+    return ROOT + currentScale[i % currentScale.length] + 12 * Math.floor(i / currentScale.length);
 }
 
 function noteName(n){
@@ -341,6 +350,36 @@ function fillPit(count){
     }
 }
 
+function retune(scaleName){
+    currentScale = SCALE[scaleName];
+    for(const bar of bars){
+        bar.note = barNote(bar.i);
+    }
+}
+document.getElementById('scale-select').addEventListener('change', e => {
+    retune(e.target.value);
+});
+
+let shakeTime = 0;
+let shakeMag = 0;
+
+function hitBar(b, impact){
+    const bar = barUnder(b.x);
+    bar.glow = 1;
+
+    const freq = noteToFreq(bar.note);
+    const velocity = clamp(impact / 700, 0.1, 1);
+
+    shakeTime = 0.15;
+    shakeMag = velocity * 6;
+
+    if(b.type.wave === 'pluck'){
+        playPluck(freq, velocity);
+    } else {
+        playNote(freq, b.type.wave, velocity);
+    }
+}
+
 function integrate(p, dt){
     if(p.held) return;
     p.vy += GRAVITY * dt;
@@ -349,12 +388,18 @@ function integrate(p, dt){
 }
 
 function pressDrop(){
+    dismissHint();
     if(claw.held){
         letGo();
         return;
     }
     if(claw.state !== 'idle') return;
     claw.state = 'descending';
+}
+
+function dismissHint(){
+    const hint = document.getElementById('hint');
+    if(hint) hint.classList.add('hidden');
 }
 
 function clawTouchesBall(){
@@ -406,10 +451,12 @@ function keepInBounds(b){
     if(b.x - b.r < PIT.left) { 
         b.x = PIT.left + b.r;
         b.vx *= -0.4;
+        if(Math.abs(b.vx) < 10) b.vx = 0;
     }
     if(b.x + b.r > PIT.right) {
         b.x = PIT.right - b.r;
         b.vx *= -0.4;
+        if(Math.abs(b.vx) < 10) b.vx = 0;
     }
 }
 
@@ -514,11 +561,19 @@ function drawAimGuide(){
 }
 
 function draw(){
+    ctx.save();
+    if(shakeTime > 0){
+        const dx = (Math.random() * 2 - 1) * shakeMag;
+        const dy = (Math.random() * 2 - 1) * shakeMag;
+        ctx.translate(dx, dy);
+    }
     drawCabinet();
     drawBars();
     drawAimGuide();
     balls.forEach(drawBall);
     drawClaw();
+
+    ctx.restore();
 }
 
 function drawBall(b){
@@ -544,6 +599,13 @@ function update(dt){
     updateClaw(dt);
     const steps = 3;
     for(let i = 0; i < steps; i++) stepPhysics(dt / steps);
+    if(shakeTime > 0) shakeTime -= dt;
+
+    spawnTimer += dt;
+    if(spawnTimer >= SPAWN_INTERVAL && balls.length < MAX_BALLS){
+        spawnTimer = 0;
+        balls.push(makeBall(randomType(), rand(PIT.left + BALL_R, PIT.right - BALL_R), 60));
+    }
 }
 
 function rand(min, max){

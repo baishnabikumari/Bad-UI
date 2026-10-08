@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clawboard</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
 </head>
 
 <body>
@@ -14,6 +15,7 @@
         <p class="sub">grab a note. drop it. the machine plays.</p>
 
         <div class="machine">
+            <div class="hint" id="hint">arrows / A·D to move - space to drop</div>
             <canvas id="game" width="900" height="600"></canvas>
         </div>
 
@@ -21,6 +23,14 @@
             <button id="btn-left" class="pad">&larr;</button>
             <button id="btn-drop" class="pad drop">DROP</button>
             <button id="btn-right" class="pad">&rarr;</button>
+        </div>
+        <div class="scale-picker">
+            <span class="seq-name">SCALE</span>
+            <select id="scale-select" class="pad scale-select">
+                <option value="major">Major</option>
+                <option value="minor">Minor</option>
+                <option value="chromatic">Chromatic</option>
+            </select>
         </div>
         <div class="sequencer">
             <div class="seq-top">
