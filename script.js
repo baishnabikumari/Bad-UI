@@ -5,7 +5,7 @@ const H = canvas.height;
 const RAIL_Y = 70;
 const PIT = { left: 40, right: 860, floor: 540 };
 const GRAVITY = 1000;
-const BOUNCE = 0.35;
+const BOUNCE = 0.75;
 const CLAW_SPEED = 220;
 const DROP_SPEED = 260;
 const LIFT_SPEED = 200;
@@ -38,9 +38,8 @@ let seqPlaying = false;
 let seqTimer = null;
 let seqBpm = 110;
 let spawnTimer = 0;
-const SPAWN_INTERVAL = 4;
-const MAX_BALLS = 24;
-
+const SPAWN_INTERVAL = 2.5;
+const MAX_BALLS = 44;
 function playKick(){
     if(!audioCtx) return;
     const now = audioCtx.currentTime;
@@ -131,10 +130,10 @@ function wireMidiInputs(midiAccess){
 
 function initMidi(){
     if(!navigator.requestMIDIAccess){
-        setMidiStatus(midiAccess);
-        midiAccess.onstatechange = () => wireMidiInputs(midiAccess);
+        setMidiStatus('not supported in this browser', false);
+        return;
     }
-    navigation.requestAnimationFrame().then(midiAccess => {
+    navigator.requestMIDIAccess().then(midiAccess => {
         wireMidiInputs(midiAccess);
         midiAccess.onstatechange = () => wireMidiInputs(midiAccess);
     }).catch(() => {
@@ -325,20 +324,6 @@ function barUnder(x){
     return bars[i];
 }
 
-function hitBar(b, impact){
-    const bar = barUnder(b.x);
-    bar.glow = 1;
-
-    const freq = noteToFreq(bar.note);
-    const velocity = clamp(impact / 700, 0.1, 1);
-
-    if(b.type.wave === 'pluck'){
-        playPluck(freq, velocity);
-    } else {
-        playNote(freq, b.type.wave, velocity);
-    }
-}
-
 function makeBall(type, x, y){
     return { type, x, y, vx: 0, vy: 0, r: BALL_R, held: false };
 }
@@ -346,7 +331,7 @@ function makeBall(type, x, y){
 function fillPit(count){
     balls = [];
     for(let i = 0; i < count; i++){
-        balls.push(makeBall(randomType(), rand(PIT.left + BALL_R, PIT.right - BALL_R), rand(80, 300)));
+        balls.push(makeBall(randomType(), rand(PIT.left + BALL_R, PIT.right - BALL_R), rand(80, 420)));
     }
 }
 
@@ -359,6 +344,9 @@ function retune(scaleName){
 document.getElementById('scale-select').addEventListener('change', e => {
     retune(e.target.value);
 });
+document.getElementById('bounce-select').addEventListener('change', e => {
+    BOUNCE = Number(e.target.value);
+})
 
 let shakeTime = 0;
 let shakeMag = 0;
@@ -369,9 +357,6 @@ function hitBar(b, impact){
 
     const freq = noteToFreq(bar.note);
     const velocity = clamp(impact / 700, 0.1, 1);
-
-    shakeTime = 0.15;
-    shakeMag = velocity * 6;
 
     if(b.type.wave === 'pluck'){
         playPluck(freq, velocity);
@@ -671,6 +656,7 @@ function playNote(freq, wave, velocity){
 }
 
 function playPluck(freq, velocity){
+    if(!audioCtx) return;
     const sampleRate = audioCtx.sampleRate;
     const period = Math.round(sampleRate / freq);
     const duration = 1.2;

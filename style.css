@@ -71,6 +71,22 @@ canvas{
 .sequencer{
     margin-top: 22px;
     text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.seq-left{
+    flex: 1;
+}
+
+.seq-right{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding-top: 2px;
 }
 
 .seq-top{

@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clawboard</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
 </head>
 
 <body>
@@ -33,21 +34,35 @@
             </select>
         </div>
         <div class="sequencer">
-            <div class="seq-top">
-                <button id="seq-play" class="pad seq-play">PLAY</button>
-                <label class="bpm-label">
-                    BPM
-                    <input id="seq-bpm" type="range" min="60" max="180" value="110">
-                    <span id="seq-bpm-val">110</span>
-                </label>
+            <div class="seq-left">
+                <div class="seq-top">
+                    <button id="seq-play" class="pad seq-play">PLAY</button>
+                    <label class="bpm-label">
+                        BPM
+                        <input id="seq-bpm" type="range" min="60" max="180" value="110">
+                        <span id="seq-bpm-val">110</span>
+                    </label>
+                </div>
+
+                <div class="seq-row" data-track="kick">
+                    <span class="seq-name">KICK</span>
+                    <div class="seq-steps" id="seq-kick"></div>
+                </div>
+
+                <div class="seq-row" data-track="hat">
+                    <span class="seq-name">HAT</span>
+                    <div class="seq-steps" id="seq-hat"></div>
+                </div>
             </div>
-            <div class="seq-row" data-track="kick">
-                <span class="seq-name">KICK</span>
-                <div class="seq-steps" id="seq-kick"></div>
-            </div>
-            <div class="seq-row" data-track="hat">
-                <span class="seq-name">HAT</span>
-                <div class="seq-steps" id="seq-hat"></div>
+
+            <div class="seq-right">
+                <span class="seq-name">BOUNCE</span>
+                <select id="bounce-select" class="pad scale-select">
+                    <option value="0.25">Low</option>
+                    <option value="0.5">Medium</option>
+                    <option value="0.75" selected>High</option>
+                    <option value="0.92">Super</option>
+                </select>
             </div>
         </div>
         <p class="midi-status" id="midi-status">MIDI: not connected</p>
