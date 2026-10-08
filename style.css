@@ -136,3 +136,13 @@ canvas{
     outline: 2px solid #f2c14e;
     outline-offset: 2px;
 }
+
+.midi-status{
+    margin-top: 14px;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #8a8fa8;
+}
+.midi-status.on{
+    color: #3f9a62;
+}

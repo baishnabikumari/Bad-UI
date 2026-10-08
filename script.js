@@ -75,6 +75,63 @@ function playHat(){
     noise.start(now);
 }
 
+function noteFromMidi(midiNote, velocity){
+    const freq = noteToFreq(midiNote);
+    const v = clamp(velocity / 127, 0.1, 1);
+    playNote(freq, 'sawtooth', v);
+
+    let closest = bars[0];
+    let closestDist = Math.abs(bars[0].note - midiNote);
+    for(const bar of bars){
+        const dist = Math.abs(bar.note - midiNote);
+        if(dist < closestDist){
+            closest = bar;
+            closestDist = dist;
+        }
+    }
+    closest.glow = 1;
+}
+
+function handleMidiMessage(e){
+    const [status, note, velocity] = e.data;
+    const command = status & 0xf0;
+    const noteOn = command === 0x90 && velocity > 0;
+    if(!noteOn) return;
+
+    ensureAudio();
+    noteFromMidi(note, velocity);
+}
+
+function setMidiStatus(text, connected){
+    const el = document.getElementById('midi-status');
+    el.textContent = 'MIDI: ' + text;
+    el.classList.toggle('on', connected);
+}
+
+function wireMidiInputs(midiAccess){
+    const inputs = [...midiAccess.inputs.values()];
+    if(inputs.length === 0){
+        setMidiStatus('no device found', false);
+        return;
+    }
+    for(const input of inputs){
+        input.onmidimessage = handleMidiMessage;
+    }
+    setMidiStatus(inputs[0].name, true);
+}
+
+function initMidi(){
+    if(!navigator.requestMIDIAccess){
+        setMidiStatus(midiAccess);
+        midiAccess.onstatechange = () => wireMidiInputs(midiAccess);
+    }
+    navigation.requestAnimationFrame().then(midiAccess => {
+        wireMidiInputs(midiAccess);
+        midiAccess.onstatechange = () => wireMidiInputs(midiAccess);
+    }).catch(() => {
+        setMidiStatus('permission denied', false);
+    });
+}
 
 function buildSeqUI(){
     for(const track of ['kick', 'hat']){
@@ -267,7 +324,7 @@ function hitBar(b, impact){
     const velocity = clamp(impact / 700, 0.1, 1);
 
     if(b.type.wave === 'pluck'){
-        playNote(freq, velocity);
+        playPluck(freq, velocity);
     } else {
         playNote(freq, b.type.wave, velocity);
     }
@@ -544,7 +601,7 @@ function playNote(freq, wave, velocity){
         const osc = audioCtx.createOscillator();
         osc.type = wave;
         osc.frequency.value = freq;
-        osc.detunes.value = freq;
+        osc.detune.value = cents;
         osc.connect(filter);
         osc.start(now);
         osc.stop(now + 0.95);
@@ -584,4 +641,5 @@ function playPluck(freq, velocity){
 
 buildSeqUI();
 fillPit(16);
+initMidi();
 requestAnimationFrame(frame);
