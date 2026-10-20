@@ -2,6 +2,8 @@
 
 A claw machine that is also a music instrument. take a ball carry it and drop it - the machine plays the note for you.
 
+**Ai declaration** - i have used ai while i was building the bounce logic just to get some idea rest the core and code is mine own build, used a 1%-2% ai to fix the audio API i am sure the AI usage < 5%.
+
 ## ScreenShoooot and Demo Video.
 <img width="1072" height="1018" alt="Screenshot 2026-10-09 at 1 10 02 AM" src="https://github.com/user-attachments/assets/48194412-87c3-41dc-9961-7feb32c09a21" />
 
